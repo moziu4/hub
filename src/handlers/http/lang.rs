@@ -5,7 +5,7 @@ use crate::handlers::forwarding::{forward_request, DataType, HTTPMethod};
 
 pub fn service(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/lang")
+        web::scope("/api/lang")
             .route(
                 "/statics/{group}",
                 web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
@@ -15,6 +15,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/statics/{group}",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )

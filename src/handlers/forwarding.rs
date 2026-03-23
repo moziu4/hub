@@ -6,6 +6,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use crate::context::Context;
+use crate::handlers::verify_token::Claims;
 
 #[derive(Clone, Debug)]
 pub enum HTTPMethod {
@@ -27,6 +28,7 @@ pub fn forward_request(
     endpoint: &'static str,
     method: HTTPMethod,
     data_type: DataType,
+    claims: Option<Claims>,
 ) -> impl Fn(HttpRequest, web::Bytes, web::Data<Arc<Context>>) -> Pin<Box<dyn Future<Output = HttpResponse> + Send>> {
     move |req, body, context| {
         let url = build_url(service, endpoint, &req);
@@ -36,13 +38,33 @@ pub fn forward_request(
         println!("{:?}", cloned_data_type);
         let cloned_method = method.clone();
 
-        let headers: Vec<(String, String)> = req
+        let mut headers: Vec<(String, String)> = req
             .headers()
             .iter()
             .filter(|(name, _)| !["host", "content-length", "accept-encoding", "connection", "upgrade", "referer", "origin"]
                 .contains(&name.as_str()))
             .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_string()))
             .collect();
+
+        if let Some(host) = req.headers().get("host") {
+            if let Ok(host_str) = host.to_str() {
+                headers.push(("X-Tenant-Id".to_string(), host_str.to_string()));
+            }
+        }
+
+        // Inyectar datos del usuario autenticado si existen
+        if let Some(ref c) = claims {
+            headers.push(("X-User-Id".to_string(), c.sub.clone()));
+            headers.push(("X-User-Role".to_string(), c.role_id.to_string()));
+            
+            if let Some(tenant_id) = c.tenant_id {
+                headers.push(("X-User-Tenant-Id".to_string(), tenant_id.to_string()));
+            }
+            if let Some(agency_id) = c.agency_id {
+                headers.push(("X-User-Agency-Id".to_string(), agency_id.to_string()));
+            }
+        }
+
         println!("Headers recibidos en hub_service:");
         for (key, value) in &headers {
             println!("  {}: {}", key, value);
@@ -61,9 +83,22 @@ pub fn forward_request(
 }
 
 fn build_url(service: &str, endpoint: &str, req: &HttpRequest) -> String {
-    let base_url = std::env::var(format!("{}_SERVICE_URL", service.to_uppercase()))
-        .unwrap_or_else(|_| "http://localhost:4000".to_string());
-    println!("Base URL: {}", base_url);
+    println!("DEBUG: build_url llamado para servicio: '{}'", service);
+    let env_var_name = format!("{}_SERVICE_URL", service.to_uppercase());
+    println!("DEBUG: Buscando variable de entorno: '{}'", env_var_name);
+    
+    let base_url = match std::env::var(&env_var_name) {
+        Ok(val) => {
+            println!("DEBUG: ¡Encontrada! {} = '{}'", env_var_name, val);
+            val
+        },
+        Err(e) => {
+            println!("DEBUG: Error leyendo {}: {:?}. Usando default.", env_var_name, e);
+            "http://localhost:4000".to_string()
+        }
+    };
+    
+    println!("DEBUG: Base URL resultante: '{}'", base_url);
     let mut url = base_url + endpoint;
     println!("URL: {}", url);
 

@@ -2,10 +2,11 @@ use std::sync::Arc;
 use actix_web::{web, HttpRequest};
 use crate::context;
 use crate::handlers::forwarding::{forward_request, DataType, HTTPMethod};
+use crate::handlers::verify_token::verify_token;
 
 pub fn service(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/shop")
+        web::scope("/api/shop")
             .route(
                 "/products/all",
                 web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
@@ -15,6 +16,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/products/all",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -27,6 +29,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/products/new",
                         HTTPMethod::POST,
                         DataType::JSON,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -39,7 +42,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/products/id/{id}",
                         HTTPMethod::GET,
                         DataType::None,
-                        
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -52,6 +55,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/products/paginated",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -64,6 +68,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/products/edit/{id}",
                         HTTPMethod::PATCH,
                         DataType::JSON,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -76,6 +81,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/categories/all",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -88,6 +94,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/categories/new",
                         HTTPMethod::POST,
                         DataType::JSON,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -100,6 +107,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/categories/id/{id}",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -112,6 +120,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/categories/title/{title}",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -124,6 +133,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/categories/edit/{id}",
                         HTTPMethod::PATCH,
                         DataType::JSON,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -137,6 +147,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/categories/delete/{id}",
                         HTTPMethod::DELETE,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             ),

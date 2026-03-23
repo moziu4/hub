@@ -8,7 +8,7 @@ use reqwest::Client;
 use hub::context::Context;
 use hub::handlers::{http::{user, shop, lang}};
 use actix_web::dev::RequestHead;
-use hub::handlers::http::content;
+use hub::handlers::http::{content, tenant};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -26,20 +26,18 @@ async fn main() -> std::io::Result<()> {
     let context = Arc::new(Context::new(client.clone()));
 
     let bind_address = dotenv::var("HTTP_BIND").unwrap_or_else(|_| "localhost:8080".to_string());
+    println!("Iniciando Hub en: {}", bind_address);
+    println!("Configuración de servicios detectada:");
+    for (key, value) in std::env::vars() {
+        if key.ends_with("_SERVICE_URL") {
+            println!("  {} = {}", key, value);
+        }
+    }
 
     
     HttpServer::new(move || {
         let cors = Cors::default()
-            .allowed_origin_fn(|origin: &HeaderValue, _req_head: &RequestHead| {
-                let front_dev = dotenv::var("URL_FRONT_DEV").unwrap_or_default();
-                let front_prod = dotenv::var("URL_FRONT").unwrap_or_default();
-
-                if let Ok(origin_str) = origin.to_str() {
-                    origin_str == front_dev || origin_str == front_prod
-                } else {
-                    false
-                }
-            })
+            .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "PATCH", "DELETE", "OPTIONS"])
             .allow_any_header() 
             .supports_credentials()
@@ -54,6 +52,7 @@ async fn main() -> std::io::Result<()> {
             .configure(shop::service) 
             .configure(lang::service)
             .configure(content::service)
+            .configure(tenant::service)
     })
         .bind(&bind_address)?
         .run()

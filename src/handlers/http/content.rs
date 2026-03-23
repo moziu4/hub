@@ -5,7 +5,7 @@ use crate::handlers::forwarding::{forward_request, DataType, HTTPMethod};
 
 pub fn service(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/content")
+        web::scope("/api/content")
             .route(
                 "/catalog",
                 web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
@@ -15,6 +15,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/content/catalog",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -27,6 +28,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/content/new",
                         HTTPMethod::POST,
                         DataType::JSON,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -39,6 +41,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/content/all",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -51,6 +54,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/content/id/{id}",
                         HTTPMethod::GET,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -63,6 +67,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/content/{id}",
                         HTTPMethod::PATCH,
                         DataType::JSON,
+                        None,
                     )(req, body, ctx).await
                 }),
             )
@@ -75,6 +80,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         "/api/content/{id}",
                         HTTPMethod::DELETE,
                         DataType::None,
+                        None,
                     )(req, body, ctx).await
                 }),
             ),
