@@ -19,5 +19,18 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                     )(req, body, ctx).await
                 }),
             )
+            .route(
+                "/languages",
+                web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
+                    println!("Actix recibió la solicitud GET a /languages");
+                    forward_request(
+                        "lang",
+                        "/api/languages",
+                        HTTPMethod::GET,
+                        DataType::None,
+                        None,
+                    )(req, body, ctx).await
+                }),
+            )
     );
 }

@@ -20,18 +20,20 @@ pub enum HTTPMethod {
 #[derive(Clone, Debug)]
 pub enum DataType {
     JSON,
+    Multipart,
     None,
 }
 
-pub fn forward_request(
+pub fn forward_request<S: Into<String>>(
     service: &'static str,
-    endpoint: &'static str,
+    endpoint: S,
     method: HTTPMethod,
     data_type: DataType,
     claims: Option<Claims>,
 ) -> impl Fn(HttpRequest, web::Bytes, web::Data<Arc<Context>>) -> Pin<Box<dyn Future<Output = HttpResponse> + Send>> {
+    let endpoint = endpoint.into();
     move |req, body, context| {
-        let url = build_url(service, endpoint, &req);
+        let url = build_url(service, &endpoint, &req);
         let client = context.client.clone();
 
         let cloned_data_type = data_type.clone();
@@ -46,10 +48,33 @@ pub fn forward_request(
             .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_string()))
             .collect();
 
-        if let Some(host) = req.headers().get("host") {
-            if let Ok(host_str) = host.to_str() {
-                headers.push(("X-Tenant-Id".to_string(), host_str.to_string()));
-            }
+        // Solo inyectar X-Tenant-Id si no viene ya en la petición original
+        if !headers.iter().any(|(h, _)| h.to_lowercase() == "x-tenant-id") {
+            let host_name = req.connection_info().host().to_string();
+            headers.push(("X-Tenant-Id".to_string(), host_name));
+        }
+
+        // Resolución y Normalización de Idioma
+        // Orden: Cookie 'lang' > Header 'X-Language' > Header 'Accept-Language'
+        let lang = req.cookie("lang")
+            .map(|c| c.value().to_string())
+            .or_else(|| {
+                req.headers().get("X-Language")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string())
+            })
+            .or_else(|| {
+                req.headers().get("Accept-Language")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.split(',').next())
+                    .map(|s| s.trim().to_string())
+            });
+
+        // Normalización: Envía siempre el idioma resultante en el header X-Language
+        // Si no se detecta idioma, no se envía el header (el microservicio usará su default_language)
+        headers.retain(|(h, _)| h.to_lowercase() != "x-language");
+        if let Some(l) = lang {
+            headers.push(("X-Language".to_string(), l));
         }
 
         // Inyectar datos del usuario autenticado si existen
@@ -154,6 +179,11 @@ pub async fn perform_request(
                 }
             }
         }
+        DataType::Multipart => {
+            if !body.is_empty() {
+                request_builder = request_builder.body(body);
+            }
+        }
         DataType::None => {}
     }
 
@@ -183,6 +213,8 @@ pub async fn perform_request(
     let mut http_response = HttpResponse::build(
         actix_web::http::StatusCode::from_u16(status_code.as_u16()).unwrap(),
     );
+
+    http_response.insert_header(("Vary", "X-Language"));
 
     if let Some(content_type) = content_type {
         http_response.content_type(content_type);

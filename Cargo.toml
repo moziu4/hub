@@ -12,4 +12,9 @@ serde = { version = "1.0", features = ["derive"] }
 reqwest = { version = "0.12.9", features = ["json"] }
 actix-cors = "0.7.0"
 perms = { git = "https://github.com/moziu4/perms", branch = "master" }
+redis = { version = "0.27.6", features = ["tokio-comp"] }
+async-nats = "0.38.0"
+futures = "0.3.31"
+tracing = "0.1.40"
+tokio = { version = "1", features = ["full"] }
 

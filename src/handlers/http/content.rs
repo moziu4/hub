@@ -2,10 +2,15 @@ use std::sync::Arc;
 use actix_web::{web, HttpRequest};
 use crate::context;
 use crate::handlers::forwarding::{forward_request, DataType, HTTPMethod};
+use crate::handlers::http::tenant::get_tenant_info;
 
 pub fn service(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/content")
+            .route(
+                "/slug/{slug}",
+                web::get().to(get_tenant_info),
+            )
             .route(
                 "/catalog",
                 web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
@@ -39,6 +44,19 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                     forward_request(
                         "content",
                         "/api/content/all",
+                        HTTPMethod::GET,
+                        DataType::None,
+                        None,
+                    )(req, body, ctx).await
+                }),
+            )
+            .route(
+                "/active",
+                web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
+                    println!("Actix recibió GET /content/active");
+                    forward_request(
+                        "content",
+                        "/api/content/active",
                         HTTPMethod::GET,
                         DataType::None,
                         None,

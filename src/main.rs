@@ -5,8 +5,9 @@ use std::sync::Arc;
 use actix_web::http::header::{HeaderValue};
 use env_logger::Env;
 use reqwest::Client;
+use redis::Client as RedisClient;
 use hub::context::Context;
-use hub::handlers::{http::{user, shop, lang}};
+use hub::handlers::{http::{user, shop, lang, asset}, nats};
 use actix_web::dev::RequestHead;
 use hub::handlers::http::{content, tenant};
 
@@ -23,7 +24,21 @@ async fn main() -> std::io::Result<()> {
             .unwrap(),
     );
 
-    let context = Arc::new(Context::new(client.clone()));
+    let redis_url = dotenv::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1/".to_string());
+    let redis_client = Arc::new(RedisClient::open(redis_url.clone()).expect("Error configurando Redis"));
+    println!("Cliente de Redis configurado para: {}", redis_url);
+
+    let nats_url = dotenv::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
+    let nats_client = Arc::new(async_nats::connect(nats_url).await.expect("Error conectando a NATS"));
+    println!("Cliente de NATS configurado");
+
+    let context = Arc::new(Context::new(client.clone(), redis_client.clone(), nats_client.clone()));
+
+    // Iniciar el listener de NATS en una tarea separada
+    let nats_ctx = context.clone();
+    tokio::spawn(async move {
+        nats::listeners::start_nats_listener(nats_ctx).await;
+    });
 
     let bind_address = dotenv::var("HTTP_BIND").unwrap_or_else(|_| "localhost:8080".to_string());
     println!("Iniciando Hub en: {}", bind_address);
@@ -53,6 +68,7 @@ async fn main() -> std::io::Result<()> {
             .configure(lang::service)
             .configure(content::service)
             .configure(tenant::service)
+            .configure(asset::service)
     })
         .bind(&bind_address)?
         .run()
