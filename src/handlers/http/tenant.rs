@@ -732,8 +732,7 @@ pub async fn get_tenant_info(
     };
     println!("ID del tenant extraído: {}", tenant_id);
 
-    // 4. Llamada al servicio Content con tenant_id y slug
-    let content_data: serde_json::Value = if tenant_id == "unknown" {
+    let mut content_data: serde_json::Value = if tenant_id == "unknown" {
         serde_json::Value::Null
     } else {
         println!("Llamando al servicio Content con tenant_id: {} y slug: {} y locale: {:?}", tenant_id, slug, lang);
@@ -776,6 +775,58 @@ pub async fn get_tenant_info(
             },
         }
     };
+
+    // 4.1. Procesar Assets si existen en el contenido
+    let assets_service_url = std::env::var("ASSETS_SERVICE_URL")
+        .unwrap_or_else(|_| "http://localhost:4004".to_string());
+
+    if let Some(content_obj) = content_data.get_mut("content") {
+        if let Some(blocks) = content_obj.get_mut("blocks").and_then(|b| b.as_array_mut()) {
+            for block in blocks {
+                if let Some(block_content) = block.get_mut("content") {
+                    // Buscar image_item en el contenido del bloque
+                    if let Some(image_item) = block_content.get_mut("image_item") {
+                        let image_id = image_item.get("id").and_then(|id| id.as_str());
+
+                        if let Some(id) = image_id {
+                            let asset_url = format!("{}/assets/{}", assets_service_url, id);
+                            println!("DEBUG: Llamando a Assets Service: {}", asset_url);
+                            
+                            match ctx.client.get(&asset_url).send().await {
+                                Ok(asset_res) => {
+                                    let status = asset_res.status();
+                                    println!("DEBUG: Assets Service respondió con status: {}", status);
+                                    if status.is_success() {
+                                        if let Ok(asset_info) = asset_res.json::<serde_json::Value>().await {
+                                            println!("DEBUG: Info del asset recibida: {:?}", asset_info);
+                                            // Combinar la info del asset en el image_item
+                                            if let Some(item_obj) = image_item.as_object_mut() {
+                                                println!("DEBUG: image_item ANTES de combinar: {:?}", item_obj);
+                                                if let Some(asset_obj) = asset_info.as_object() {
+                                                    for (key, value) in asset_obj {
+                                                        item_obj.insert(key.clone(), value.clone());
+                                                    }
+                                                }
+                                                println!("DEBUG: image_item DESPUÉS de combinar: {:?}", item_obj);
+                                            }
+                                        } else {
+                                            println!("DEBUG: No se pudo parsear el JSON de Assets Service");
+                                        }
+                                    } else {
+                                        let error_text = asset_res.text().await.unwrap_or_else(|_| "No se pudo leer el cuerpo del error".to_string());
+                                        println!("DEBUG: Error body de Assets Service: {}", error_text);
+                                    }
+                                },
+                                Err(e) => {
+                                    println!("DEBUG: Fallo total al enviar la petición al Assets Service: {}", e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let final_response = CombinedResponse {
         tenant: tenant_data,

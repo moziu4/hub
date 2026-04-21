@@ -7,7 +7,7 @@ use env_logger::Env;
 use reqwest::Client;
 use redis::Client as RedisClient;
 use hub::context::Context;
-use hub::handlers::{http::{user, shop, lang, asset}, nats};
+use hub::handlers::{http::{user, shop, lang, asset, analytics}, nats};
 use actix_web::dev::RequestHead;
 use hub::handlers::http::{content, tenant};
 
@@ -69,6 +69,7 @@ async fn main() -> std::io::Result<()> {
             .configure(content::service)
             .configure(tenant::service)
             .configure(asset::service)
+            .configure(analytics::service)
     })
         .bind(&bind_address)?
         .run()
