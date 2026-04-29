@@ -9,7 +9,7 @@ use redis::Client as RedisClient;
 use hub::context::Context;
 use hub::handlers::{http::{user, shop, lang, asset, analytics}, nats};
 use actix_web::dev::RequestHead;
-use hub::handlers::http::{content, tenant};
+use hub::handlers::http::{constructor, content, tenant};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -54,7 +54,13 @@ async fn main() -> std::io::Result<()> {
         let cors = Cors::default()
             .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "PATCH", "DELETE", "OPTIONS"])
-            .allow_any_header() 
+            .allowed_headers(vec![
+                actix_web::http::header::AUTHORIZATION,
+                actix_web::http::header::CONTENT_TYPE,
+                actix_web::http::header::ACCEPT,
+                actix_web::http::header::HeaderName::from_static("x-tenant-id"),
+                actix_web::http::header::HeaderName::from_static("x-language"),
+            ])
             .supports_credentials()
             .max_age(3600);
 
@@ -70,6 +76,7 @@ async fn main() -> std::io::Result<()> {
             .configure(tenant::service)
             .configure(asset::service)
             .configure(analytics::service)
+            .configure(constructor::service)
     })
         .bind(&bind_address)?
         .run()
