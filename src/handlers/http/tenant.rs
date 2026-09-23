@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use actix_web::{web, HttpRequest, HttpResponse};
-use serde::{Deserialize, Serialize};
 use redis::AsyncCommands;
 use crate::context;
 use crate::handlers::forwarding::{forward_request, DataType, HTTPMethod};

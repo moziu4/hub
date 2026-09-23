@@ -2,14 +2,11 @@ use dotenv::dotenv;
 use actix_web::{web, App, HttpServer, middleware};
 use actix_cors::Cors;
 use std::sync::Arc;
-use actix_web::http::header::{HeaderValue};
 use env_logger::Env;
 use reqwest::Client;
 use redis::Client as RedisClient;
 use hub::context::Context;
-use hub::handlers::{http::{user, shop, lang, asset, analytics}, nats};
-use actix_web::dev::RequestHead;
-use hub::handlers::http::{constructor, content, tenant};
+use hub::handlers::{http::{user, lang, asset, analytics, tenant}, nats};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -70,13 +67,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors) 
             .app_data(web::Data::new(context.clone())) 
             .configure(user::service) 
-            .configure(shop::service) 
             .configure(lang::service)
-            .configure(content::service)
             .configure(tenant::service)
             .configure(asset::service)
             .configure(analytics::service)
-            .configure(constructor::service)
     })
         .bind(&bind_address)?
         .run()

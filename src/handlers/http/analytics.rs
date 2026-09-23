@@ -75,19 +75,7 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                     )(req, body, ctx).await
                 }),
             )
-            // .route(
-            //     "/tenant/{tenant_id}/blocks",
-            //     web::post().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-            //         println!("Actix recibió POST /api/analytics/tenant/{{tenant_id}}/blocks");
-            //         forward_request(
-            //             "analytics",
-            //             "/analytics/tenant/{tenant_id}/blocks",
-            //             HTTPMethod::POST,
-            //             DataType::JSON,
-            //             None,
-            //         )(req, body, ctx).await
-            //     }),
-            // )
+        
     );
 }
 
