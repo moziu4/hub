@@ -3,6 +3,7 @@ pub mod lang;
 pub mod tenant;
 pub mod asset;
 pub mod analytics;
+pub mod ai;
 
 
 

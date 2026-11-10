@@ -6,7 +6,7 @@ use env_logger::Env;
 use reqwest::Client;
 use redis::Client as RedisClient;
 use hub::context::Context;
-use hub::handlers::{http::{user, lang, asset, analytics, tenant}, nats};
+use hub::handlers::{http::{user, lang, asset, analytics, tenant, ai}, nats};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -55,7 +55,6 @@ async fn main() -> std::io::Result<()> {
                 actix_web::http::header::AUTHORIZATION,
                 actix_web::http::header::CONTENT_TYPE,
                 actix_web::http::header::ACCEPT,
-                actix_web::http::header::HeaderName::from_static("x-tenant-id"),
                 actix_web::http::header::HeaderName::from_static("x-language"),
             ])
             .supports_credentials()
@@ -71,6 +70,7 @@ async fn main() -> std::io::Result<()> {
             .configure(tenant::service)
             .configure(asset::service)
             .configure(analytics::service)
+            .configure(ai::service)
     })
         .bind(&bind_address)?
         .run()

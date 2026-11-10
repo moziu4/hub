@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: hub-service frontend API
+  version: 0.1.0
+  description: Contrato resumido de las rutas registradas actualmente en src/handlers/http.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/users/all:
+    get: {summary: Lista usuarios, responses: {'200': {description: Respuesta de user-service}, '401': {description: Token inválido}, '403': {description: Sin permiso}}}
+  /api/users/newuser:
+    post: {summary: Crea usuario, requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'2XX': {description: Respuesta de user-service}}}
+  /api/users/login:
+    post: {summary: Inicia sesión, requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, security: [], responses: {'2XX': {description: Token o respuesta de user-service}}}
+  /api/user/catalogs/roles:
+    get: {summary: Lista roles, responses: {'2XX': {description: Catálogo}}}
+  /api/user/catalogs/document-types:
+    get: {summary: Lista tipos de documento, responses: {'2XX': {description: Catálogo}}}
+  /api/organization:
+    post: {summary: Crea organización, responses: {'2XX': {description: Respuesta de tenant-service}}}
+  /api/organization/all:
+    get: {summary: Lista organizaciones, responses: {'2XX': {description: Respuesta de tenant-service}}}
+  /api/organization/{id}:
+    get: {summary: Obtiene organización, parameters: [{'$ref': '#/components/parameters/Id'}], responses: {'2XX': {description: Organización}}}
+    patch: {summary: Actualiza organización, parameters: [{'$ref': '#/components/parameters/Id'}], responses: {'2XX': {description: Organización}}}
+    delete: {summary: Elimina organización, parameters: [{'$ref': '#/components/parameters/Id'}], responses: {'2XX': {description: Confirmación}}}
+  /assets/products:
+    post: {summary: Sube producto, requestBody: {content: {multipart/form-data: {schema: {type: object}}}}, responses: {'2XX': {description: Respuesta de asset-service}}}
+  /assets/images:
+    post: {summary: Sube imagen, requestBody: {content: {multipart/form-data: {schema: {type: object}}}}, responses: {'2XX': {description: Respuesta de asset-service}}}
+  /assets/contents:
+    post: {summary: Sube contenido, requestBody: {content: {multipart/form-data: {schema: {type: object}}}}, responses: {'2XX': {description: Respuesta de asset-service}}}
+  /assets/{id}/{version}:
+    get: {summary: Obtiene asset, parameters: [{'$ref': '#/components/parameters/Id'}, {'$ref': '#/components/parameters/Version'}], responses: {'2XX': {description: Asset}}}
+  /api/lang/statics/{group}:
+    get: {summary: Obtiene traducciones estáticas, parameters: [{name: group, in: path, required: true, schema: {type: string}}], responses: {'2XX': {description: Traducciones}}}
+  /api/lang/languages:
+    get: {summary: Lista idiomas, responses: {'2XX': {description: Idiomas}}}
+  /api/analytics/events:
+    post: {summary: Publica evento de analítica, security: [], responses: {'202': {description: Publicado de forma asíncrona}}}
+  /api/analytics/summary:
+    post: {summary: Consulta resumen, responses: {'2XX': {description: Resumen}}}
+  /api/analytics/pages:
+    post: {summary: Consulta páginas, responses: {'2XX': {description: Datos}}}
+  /api/analytics/organization/{organization_id}/compare:
+    post: {summary: Compara organizaciones, responses: {'2XX': {description: Comparativa}}}
+  /api/analytics/tenant/{tenant_id}/events-by-type:
+    post: {summary: Agrupa eventos por tipo, responses: {'2XX': {description: Datos}}}
+  /ai/chat:
+    post: {summary: Chat IA, requestBody: {$ref: '#/components/requestBodies/Json'}, responses: {'2XX': {description: Respuesta de ai-service}, '401': {description: Token inválido}}}
+  /ai/documents/upload:
+    post: {summary: Sube documento normativo, requestBody: {$ref: '#/components/requestBodies/Multipart'}, responses: {'2XX': {description: Documento}}}
+  /ai/documents:
+    get: {summary: Lista documentos, responses: {'2XX': {description: Documentos}}}
+    post: {summary: Crea documento, requestBody: {$ref: '#/components/requestBodies/Json'}, responses: {'2XX': {description: Documento}}}
+  /ai/documents/{id}:
+    get: {summary: Obtiene documento, parameters: [{'$ref': '#/components/parameters/Id'}], responses: {'2XX': {description: Documento}}}
+    delete: {summary: Elimina documento, parameters: [{'$ref': '#/components/parameters/Id'}], responses: {'2XX': {description: Confirmación}}}
+  /ai/documents/search:
+    post: {summary: Busca documentos, requestBody: {$ref: '#/components/requestBodies/Json'}, responses: {'2XX': {description: Resultados}}}
+  /ai/user-documents/upload:
+    post: {summary: Sube documento privado, requestBody: {$ref: '#/components/requestBodies/Multipart'}, responses: {'2XX': {description: Documento}}}
+  /ai/conversations:
+    get: {summary: Lista conversaciones, responses: {'2XX': {description: Conversaciones}}}
+  /ai/conversations/{id}:
+    get: {summary: Obtiene conversación, parameters: [{'$ref': '#/components/parameters/Id'}], responses: {'2XX': {description: Conversación}}}
+    delete: {summary: Elimina conversación, parameters: [{'$ref': '#/components/parameters/Id'}], responses: {'2XX': {description: Confirmación}}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: string}}
+    Version: {name: version, in: path, required: true, schema: {type: string}}
+  requestBodies:
+    Json: {required: true, content: {application/json: {schema: {type: object}}}}
+    Multipart: {required: true, content: {multipart/form-data: {schema: {type: object}}}}

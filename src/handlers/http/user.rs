@@ -19,14 +19,6 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         }
                     };
 
-                    // Ejemplo de validación de permiso: ver todos los usuarios (ID 24)
-                    use crate::handlers::verify_token::has_permission;
-                    let role = claims.role_id.to_string();
-
-                    if !has_permission(&ctx.client, &role, 24).await {
-                        return actix_web::HttpResponse::Forbidden().body("No tienes permiso para ver todos los usuarios");
-                    }
-
                     forward_request(
                         "user",
                         "/api/users/all",

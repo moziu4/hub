@@ -3,6 +3,7 @@ use actix_web::{HttpRequest};
 use actix_web::error::{ErrorInternalServerError, ErrorUnauthorized};
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
+use perms::{verify_context, RequestContext};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -11,7 +12,11 @@ pub struct Claims {
     pub permissions: Vec<String>,
     pub role_id: u32,
     pub tenant_id: Option<u32>,
-    pub agency_id: Option<u32>,
+    pub organization_id: Option<u32>,
+    #[serde(skip)]
+    pub context: Option<RequestContext>,
+    #[serde(skip)]
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Hash, Eq, Copy)]
@@ -19,9 +24,9 @@ pub struct Claims {
 pub enum Role
 {
     SuperAdmin = 1,
-    AgencyOwner = 2,
-    AgencyAdmin = 3,
-    AgencyMember = 4,
+    OrganizationOwner = 2,
+    OrganizationAdmin = 3,
+    OrganizationMember = 4,
     TenantAdmin = 5,
     Editor = 6,
     Client = 7,
@@ -32,9 +37,9 @@ impl Role {
     pub fn from_id(id: u32) -> Option<Self> {
         match id {
             1 => Some(Role::SuperAdmin),
-            2 => Some(Role::AgencyOwner),
-            3 => Some(Role::AgencyAdmin),
-            4 => Some(Role::AgencyMember),
+            2 => Some(Role::OrganizationOwner),
+            3 => Some(Role::OrganizationAdmin),
+            4 => Some(Role::OrganizationMember),
             5 => Some(Role::TenantAdmin),
             6 => Some(Role::Editor),
             7 => Some(Role::Client),
@@ -50,6 +55,17 @@ impl Role {
 
 pub async fn verify_token(req: HttpRequest) -> Result<Claims, actix_web::Error>
 {
+    if let (Ok(public_key), Ok(issuer), Ok(audience), Ok(key_id)) = (
+        env::var("PERMS_PUBLIC_KEY"),
+        env::var("PERMS_ISSUER"),
+        env::var("PERMS_AUDIENCE"),
+        env::var("PERMS_KEY_ID"),
+    ) {
+        let token = bearer_token(&req)?;
+        let context = verify_context(token, public_key.as_bytes(), &issuer, &audience, &key_id)
+            .map_err(|_| ErrorUnauthorized("Contexto firmado inválido o expirado"))?;
+        return Ok(claims_from_context(context, token.to_string()));
+    }
     let secret = env::var("SECRET_KEY").map_err(|_| {
         eprintln!("SECRET_KEY no encontrado");
         ErrorInternalServerError("Error interno: SECRET_KEY no configurado")
@@ -83,14 +99,14 @@ pub async fn verify_token(req: HttpRequest) -> Result<Claims, actix_web::Error>
         ErrorInternalServerError("Error interno de procesamiento de token")
     })?;
 
-    // Si la librería ya no provee tenant_id o agency_id en Claims,
+    // Si la librería ya no provee tenant_id u organization_id en Claims,
     // nos aseguramos de que existan como null en el JSON para que la deserialización a Option no falle si los necesitamos.
     if let Some(obj) = claims_json.as_object_mut() {
         if !obj.contains_key("tenant_id") {
             obj.insert("tenant_id".to_string(), serde_json::Value::Null);
         }
-        if !obj.contains_key("agency_id") {
-            obj.insert("agency_id".to_string(), serde_json::Value::Null);
+        if !obj.contains_key("organization_id") {
+            obj.insert("organization_id".to_string(), serde_json::Value::Null);
         }
     }
 
@@ -108,7 +124,32 @@ pub async fn verify_token(req: HttpRequest) -> Result<Claims, actix_web::Error>
          }
     }
     
-    Ok(claims)
+    Ok(Claims { token: Some(token_str.to_string()), ..claims })
+}
+
+fn bearer_token(req: &HttpRequest) -> Result<&str, actix_web::Error> {
+    let value = req.headers().get("Authorization")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| ErrorUnauthorized("Falta el token de autorización"))?;
+    value.strip_prefix("Bearer ")
+        .ok_or_else(|| ErrorUnauthorized("El encabezado Authorization debe comenzar con 'Bearer '") )
+}
+
+fn claims_from_context(context: RequestContext, token: String) -> Claims {
+    let sub = match &context.actor_id {
+        perms::ActorId::User(id) => id.to_string(),
+        perms::ActorId::Service(id) => id.to_string(),
+    };
+    Claims {
+        sub,
+        exp: 0,
+        permissions: context.permissions.0.iter().map(|permission| permission.name.clone()).collect(),
+        role_id: 0,
+        tenant_id: None,
+        organization_id: None,
+        context: Some(context),
+        token: Some(token),
+    }
 }
 
 pub async fn has_permission(client: &Client, role_id: &str, permission_id: i32) -> bool {

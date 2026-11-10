@@ -43,16 +43,16 @@ pub fn forward_request<S: Into<String>>(
         let mut headers: Vec<(String, String)> = req
             .headers()
             .iter()
-            .filter(|(name, _)| !["host", "content-length", "accept-encoding", "connection", "upgrade", "referer", "origin"]
+            .filter(|(name, _)| !["host", "content-length", "accept-encoding", "connection", "upgrade", "referer", "origin", "authorization"]
                 .contains(&name.as_str()))
             .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_string()))
             .collect();
 
-        // Solo inyectar X-Tenant-Id si no viene ya en la petición original
-        if !headers.iter().any(|(h, _)| h.to_lowercase() == "x-tenant-id") {
-            let host_name = req.connection_info().host().to_string();
-            headers.push(("X-Tenant-Id".to_string(), host_name));
-        }
+        // Los headers de identidad enviados por el cliente no son confiables.
+        // La identidad viaja en el contexto firmado, no en headers reconstruidos.
+        headers.retain(|(h, _)| {
+            !matches!(h.to_lowercase().as_str(), "authorization" | "x-user-id" | "x-user-role" | "x-tenant-id" | "x-user-tenant-id" | "x-user-organization-id" | "x-organization-id" | "x-actor-type" | "x-request-id")
+        });
 
         // Resolución y Normalización de Idioma
         // Orden: Cookie 'lang' > Header 'X-Language' > Header 'Accept-Language'
@@ -79,20 +79,9 @@ pub fn forward_request<S: Into<String>>(
 
         // Inyectar datos del usuario autenticado si existen
         if let Some(ref c) = claims {
-            headers.push(("X-User-Id".to_string(), c.sub.clone()));
-            headers.push(("X-User-Role".to_string(), c.role_id.to_string()));
-            
-            if let Some(tenant_id) = c.tenant_id {
-                headers.push(("X-User-Tenant-Id".to_string(), tenant_id.to_string()));
+            if let Some(token) = c.token.as_deref() {
+                headers.push(("Authorization".to_string(), format!("Bearer {}", token)));
             }
-            if let Some(agency_id) = c.agency_id {
-                headers.push(("X-User-Agency-Id".to_string(), agency_id.to_string()));
-            }
-        }
-
-        println!("Headers recibidos en hub_service:");
-        for (key, value) in &headers {
-            println!("  {}: {}", key, value);
         }
 
         Box::pin(async move {

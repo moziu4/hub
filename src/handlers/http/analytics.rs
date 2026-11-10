@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use crate::context;
 use crate::handlers::forwarding::{forward_request, DataType, HTTPMethod};
+use crate::handlers::verify_token::verify_token;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AnalyticsEvent {
@@ -50,12 +51,12 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                 }),
             )
             .route(
-                "/agency/{agency_id}/compare",
+                "/organization/{organization_id}/compare",
                 web::post().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-                    println!("Actix recibió POST /api/analytics/agency/{{agency_id}}/compare");
+                    println!("Actix recibió POST /api/analytics/organization/{{organization_id}}/compare");
                     forward_request(
                         "analytics",
-                        "/analytics/agency/{agency_id}/compare",
+                        "/analytics/organization/{organization_id}/compare",
                         HTTPMethod::POST,
                         DataType::JSON,
                         None,
@@ -84,18 +85,18 @@ async fn post_events(
     body: web::Json<AnalyticsEvent>,
     ctx: web::Data<Arc<context::Context>>,
 ) -> HttpResponse {
+    let claims = match verify_token(req.clone()).await {
+        Ok(claims) => claims,
+        Err(error) => return error.error_response(),
+    };
     let mut event = body.into_inner();
 
-    // 1. Obtener tenant_id del header o del body
-    let tenant_id = req.headers()
-        .get("X-Tenant-Id")
-        .and_then(|h| h.to_str().ok())
-        .map(|s| s.to_string())
-        .or_else(|| event.tenant_id.clone());
-
-    if let Some(tid) = tenant_id {
-        event.tenant_id = Some(tid);
-    }
+    // El ámbito confiable procede exclusivamente del contexto firmado.
+    let tenant_id = claims.context.as_ref().and_then(|context| context.scope.tenant_id());
+    let Some(tenant_id) = tenant_id else {
+        return HttpResponse::Forbidden().body("El contexto no contiene tenant_id");
+    };
+    event.tenant_id = Some(tenant_id.to_string());
 
     println!("Evento de analítica recibido: {} para tenant: {:?}", event.event_type, event.tenant_id);
 

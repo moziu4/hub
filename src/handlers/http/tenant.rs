@@ -7,18 +7,18 @@ use crate::handlers::verify_token::verify_token;
 
 pub fn service(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/api/agency")
+        web::scope("/api/organization")
             .route(
                 "",
                 web::post().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-                    println!("Forwarding POST to /api/agency");
+                    println!("Forwarding POST to /api/organization");
                     let claims = match verify_token(req.clone()).await {
                         Ok(c) => Some(c),
                         Err(e) => return HttpResponse::from_error(e),
                     };
                     forward_request(
                         "tenant",
-                        "/api/agency",
+                        "/api/organization",
                         HTTPMethod::POST,
                         DataType::JSON,
                         claims,
@@ -28,14 +28,14 @@ pub fn service(cfg: &mut web::ServiceConfig) {
             .route(
                 "/all",
                 web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-                    println!("Forwarding GET to /api/agency/all");
+                    println!("Forwarding GET to /api/organization/all");
                     let claims = match verify_token(req.clone()).await {
                         Ok(c) => Some(c),
                         Err(e) => return HttpResponse::from_error(e),
                     };
                     forward_request(
                         "tenant",
-                        "/api/agency/all",
+                        "/api/organization/all",
                         HTTPMethod::GET,
                         DataType::None,
                         claims,
@@ -45,14 +45,14 @@ pub fn service(cfg: &mut web::ServiceConfig) {
             .route(
                 "/{id}",
                 web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-                    println!("Forwarding GET to /api/agency/{{id}}");
+                    println!("Forwarding GET to /api/organization/{{id}}");
                     let claims = match verify_token(req.clone()).await {
                         Ok(c) => Some(c),
                         Err(e) => return HttpResponse::from_error(e),
                     };
                     forward_request(
                         "tenant",
-                        "/api/agency/{id}",
+                        "/api/organization/{id}",
                         HTTPMethod::GET,
                         DataType::None,
                         claims,
@@ -62,14 +62,14 @@ pub fn service(cfg: &mut web::ServiceConfig) {
             .route(
                 "/{id}",
                 web::patch().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-                    println!("Forwarding PATCH to /api/agency/{{id}}");
+                    println!("Forwarding PATCH to /api/organization/{{id}}");
                     let claims = match verify_token(req.clone()).await {
                         Ok(c) => Some(c),
                         Err(e) => return HttpResponse::from_error(e),
                     };
                     forward_request(
                         "tenant",
-                        "/api/agency/{id}",
+                        "/api/organization/{id}",
                         HTTPMethod::PATCH,
                         DataType::JSON,
                         claims,
@@ -79,14 +79,14 @@ pub fn service(cfg: &mut web::ServiceConfig) {
             .route(
                 "/{id}",
                 web::delete().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-                    println!("Forwarding DELETE to /api/agency/{{id}}");
+                    println!("Forwarding DELETE to /api/organization/{{id}}");
                     let claims = match verify_token(req.clone()).await {
                         Ok(c) => Some(c),
                         Err(e) => return HttpResponse::from_error(e),
                     };
                     forward_request(
                         "tenant",
-                        "/api/agency/{id}",
+                        "/api/organization/{id}",
                         HTTPMethod::DELETE,
                         DataType::None,
                         claims,
@@ -143,18 +143,35 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                 }),
             )
             .route(
-                "/by_agency",
+                "/by_organization",
                 web::post().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
-                    println!("Forwarding POST to /api/tenant/by_agency");
+                    println!("Forwarding POST to /api/tenant/by_organization");
                     let claims = match verify_token(req.clone()).await {
                         Ok(c) => Some(c),
                         Err(e) => return HttpResponse::from_error(e),
                     };
                     forward_request(
                         "tenant",
-                        "/api/tenant/by_agency",
+                        "/api/tenant/by_organization",
                         HTTPMethod::POST,
                         DataType::JSON,
+                        claims,
+                    )(req, body, ctx).await
+                }),
+            )
+            .route(
+                "/info",
+                web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
+                    println!("Forwarding GET to /api/tenant/info");
+                    let claims = match verify_token(req.clone()).await {
+                        Ok(c) => Some(c),
+                        Err(e) => return HttpResponse::from_error(e),
+                    };
+                    forward_request(
+                        "tenant",
+                        "/api/tenant/info",
+                        HTTPMethod::GET,
+                        DataType::None,
                         claims,
                     )(req, body, ctx).await
                 }),
@@ -268,6 +285,36 @@ pub fn service(cfg: &mut web::ServiceConfig) {
                         DataType::None,
                         claims,
                     )(req, body, ctx).await
+                }),
+            )
+            .route(
+                "/organization",
+                web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
+                    let claims = match verify_token(req.clone()).await {
+                        Ok(c) => Some(c),
+                        Err(e) => return HttpResponse::from_error(e),
+                    };
+                    forward_request("tenant", "/api/plan/organization", HTTPMethod::GET, DataType::None, claims)(req, body, ctx).await
+                }),
+            )
+            .route(
+                "/tenant",
+                web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
+                    let claims = match verify_token(req.clone()).await {
+                        Ok(c) => Some(c),
+                        Err(e) => return HttpResponse::from_error(e),
+                    };
+                    forward_request("tenant", "/api/plan/tenant", HTTPMethod::GET, DataType::None, claims)(req, body, ctx).await
+                }),
+            )
+            .route(
+                "/by_organization/{organization_id}",
+                web::get().to(|req: HttpRequest, body: web::Bytes, ctx: web::Data<Arc<context::Context>>| async move {
+                    let claims = match verify_token(req.clone()).await {
+                        Ok(c) => Some(c),
+                        Err(e) => return HttpResponse::from_error(e),
+                    };
+                    forward_request("tenant", "/api/plan/by_organization/{organization_id}", HTTPMethod::GET, DataType::None, claims)(req, body, ctx).await
                 }),
             )
 
