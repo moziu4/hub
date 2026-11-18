@@ -1,12 +1,12 @@
-use actix_web::{HttpRequest, HttpResponse, web};
+use crate::context::Context;
+use crate::handlers::verify_token::Claims;
+use actix_web::{web, HttpRequest, HttpResponse};
 use reqwest::{Client, Method};
 use serde_json;
 use std::convert::TryFrom;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use crate::context::Context;
-use crate::handlers::verify_token::Claims;
 
 #[derive(Clone, Debug)]
 pub enum HTTPMethod {
@@ -43,28 +43,47 @@ pub fn forward_request<S: Into<String>>(
         let mut headers: Vec<(String, String)> = req
             .headers()
             .iter()
-            .filter(|(name, _)| !["host", "content-length", "accept-encoding", "connection", "upgrade", "referer", "origin", "authorization"]
-                .contains(&name.as_str()))
+            .filter(|(name, _)| {
+                ![
+                    "host", "content-length", "accept-encoding", "connection", "upgrade", "referer", "origin",
+                    "authorization",
+                ]
+                .contains(&name.as_str())
+            })
             .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_string()))
             .collect();
 
         // Los headers de identidad enviados por el cliente no son confiables.
         // La identidad viaja en el contexto firmado, no en headers reconstruidos.
         headers.retain(|(h, _)| {
-            !matches!(h.to_lowercase().as_str(), "authorization" | "x-user-id" | "x-user-role" | "x-tenant-id" | "x-user-tenant-id" | "x-user-organization-id" | "x-organization-id" | "x-actor-type" | "x-request-id")
+            !matches!(
+                h.to_lowercase().as_str(),
+                "authorization"
+                    | "x-user-id"
+                    | "x-user-role"
+                    | "x-tenant-id"
+                    | "x-user-tenant-id"
+                    | "x-user-organization-id"
+                    | "x-organization-id"
+                    | "x-actor-type"
+                    | "x-request-id"
+            )
         });
 
         // Resolución y Normalización de Idioma
         // Orden: Cookie 'lang' > Header 'X-Language' > Header 'Accept-Language'
-        let lang = req.cookie("lang")
+        let lang = req
+            .cookie("lang")
             .map(|c| c.value().to_string())
             .or_else(|| {
-                req.headers().get("X-Language")
+                req.headers()
+                    .get("X-Language")
                     .and_then(|v| v.to_str().ok())
                     .map(|s| s.to_string())
             })
             .or_else(|| {
-                req.headers().get("Accept-Language")
+                req.headers()
+                    .get("Accept-Language")
                     .and_then(|v| v.to_str().ok())
                     .and_then(|s| s.split(',').next())
                     .map(|s| s.trim().to_string())
@@ -90,7 +109,7 @@ pub fn forward_request<S: Into<String>>(
                 Err(err) => {
                     eprintln!("Error en el reenvío: {}", err);
                     HttpResponse::BadGateway().body(format!("Error comunicándose con el microservicio: {}", err))
-                }
+                },
             }
         })
     }
@@ -100,7 +119,7 @@ fn build_url(service: &str, endpoint: &str, req: &HttpRequest) -> String {
     println!("DEBUG: build_url llamado para servicio: '{}'", service);
     let env_var_name = format!("{}_SERVICE_URL", service.to_uppercase());
     println!("DEBUG: Buscando variable de entorno: '{}'", env_var_name);
-    
+
     let base_url = match std::env::var(&env_var_name) {
         Ok(val) => {
             println!("DEBUG: ¡Encontrada! {} = '{}'", env_var_name, val);
@@ -109,9 +128,9 @@ fn build_url(service: &str, endpoint: &str, req: &HttpRequest) -> String {
         Err(e) => {
             println!("DEBUG: Error leyendo {}: {:?}. Usando default.", env_var_name, e);
             "http://localhost:4000".to_string()
-        }
+        },
     };
-    
+
     println!("DEBUG: Base URL resultante: '{}'", base_url);
     let mut url = base_url + endpoint;
     println!("URL: {}", url);
@@ -167,21 +186,23 @@ pub async fn perform_request(
                     eprintln!("Error: No se pudo deserializar el cuerpo en JSON.");
                 }
             }
-        }
+        },
         DataType::Multipart => {
             if !body.is_empty() {
                 request_builder = request_builder.body(body);
             }
-        }
-        DataType::None => {}
+        },
+        DataType::None => {},
     }
 
     let response = request_builder.send().await?;
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_body = response.text().await.unwrap_or_else(|_| "No se pudo obtener el error del microservicio.".to_string());
-
+        let error_body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "No se pudo obtener el error del microservicio.".to_string());
 
         let actix_status = actix_web::http::StatusCode::from_u16(status.as_u16())
             .unwrap_or(actix_web::http::StatusCode::INTERNAL_SERVER_ERROR);
@@ -199,9 +220,7 @@ pub async fn perform_request(
         .and_then(|value| value.to_str().ok());
 
     // Construir la respuesta reenviada
-    let mut http_response = HttpResponse::build(
-        actix_web::http::StatusCode::from_u16(status_code.as_u16()).unwrap(),
-    );
+    let mut http_response = HttpResponse::build(actix_web::http::StatusCode::from_u16(status_code.as_u16()).unwrap());
 
     http_response.insert_header(("Vary", "X-Language"));
 

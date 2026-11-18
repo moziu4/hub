@@ -1,9 +1,9 @@
-use std::env;
-use actix_web::{HttpRequest};
 use actix_web::error::{ErrorInternalServerError, ErrorUnauthorized};
-use serde::{Deserialize, Serialize};
-use reqwest::Client;
+use actix_web::HttpRequest;
 use perms::{verify_context, RequestContext};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::env;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -21,8 +21,7 @@ pub struct Claims {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Hash, Eq, Copy)]
 #[repr(u32)]
-pub enum Role
-{
+pub enum Role {
     SuperAdmin = 1,
     OrganizationOwner = 2,
     OrganizationAdmin = 3,
@@ -53,8 +52,7 @@ impl Role {
     }
 }
 
-pub async fn verify_token(req: HttpRequest) -> Result<Claims, actix_web::Error>
-{
+pub async fn verify_token(req: HttpRequest) -> Result<Claims, actix_web::Error> {
     if let (Ok(public_key), Ok(issuer), Ok(audience), Ok(key_id)) = (
         env::var("PERMS_PUBLIC_KEY"),
         env::var("PERMS_ISSUER"),
@@ -71,11 +69,11 @@ pub async fn verify_token(req: HttpRequest) -> Result<Claims, actix_web::Error>
         ErrorInternalServerError("Error interno: SECRET_KEY no configurado")
     })?;
 
-    let token_header = req.headers()
+    let token_header = req
+        .headers()
         .get("Authorization")
         .and_then(|value| value.to_str().ok())
         .ok_or_else(|| ErrorUnauthorized("Falta el token de autorización"))?;
-
 
     // Valida si el token tiene el formato correcto
     let token_str = if token_header.starts_with("Bearer ") {
@@ -117,22 +115,32 @@ pub async fn verify_token(req: HttpRequest) -> Result<Claims, actix_web::Error>
 
     // Validación de Tenant: Si el usuario no es SuperAdmin, podrías validar acceso aquí
     // según el host o los claims.
-    if let Some(_host) = req.headers().get("host").and_then(|v| v.to_str().ok()) {
-         if claims.role_id != Role::SuperAdmin.to_id() {
-             // Lógica opcional de validación por tenant/host
-             // println!("Validando acceso para rol: {} en host: {}", claims.role_id, host);
-         }
+    if let Some(_host) = req
+        .headers()
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+    {
+        if claims.role_id != Role::SuperAdmin.to_id() {
+            // Lógica opcional de validación por tenant/host
+            // println!("Validando acceso para rol: {} en host: {}", claims.role_id, host);
+        }
     }
-    
-    Ok(Claims { token: Some(token_str.to_string()), ..claims })
+
+    Ok(Claims {
+        token: Some(token_str.to_string()),
+        ..claims
+    })
 }
 
 fn bearer_token(req: &HttpRequest) -> Result<&str, actix_web::Error> {
-    let value = req.headers().get("Authorization")
+    let value = req
+        .headers()
+        .get("Authorization")
         .and_then(|value| value.to_str().ok())
         .ok_or_else(|| ErrorUnauthorized("Falta el token de autorización"))?;
-    value.strip_prefix("Bearer ")
-        .ok_or_else(|| ErrorUnauthorized("El encabezado Authorization debe comenzar con 'Bearer '") )
+    value
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| ErrorUnauthorized("El encabezado Authorization debe comenzar con 'Bearer '"))
 }
 
 fn claims_from_context(context: RequestContext, token: String) -> Claims {
@@ -143,7 +151,12 @@ fn claims_from_context(context: RequestContext, token: String) -> Claims {
     Claims {
         sub,
         exp: 0,
-        permissions: context.permissions.0.iter().map(|permission| permission.name.clone()).collect(),
+        permissions: context
+            .permissions
+            .0
+            .iter()
+            .map(|permission| permission.name.clone())
+            .collect(),
         role_id: 0,
         tenant_id: None,
         organization_id: None,
@@ -159,9 +172,8 @@ pub async fn has_permission(client: &Client, role_id: &str, permission_id: i32) 
         return true;
     }
 
-    let user_service_url = env::var("USER_SERVICE_URL")
-        .unwrap_or_else(|_| "http://localhost:4000".to_string());
-    
+    let user_service_url = env::var("USER_SERVICE_URL").unwrap_or_else(|_| "http://localhost:4000".to_string());
+
     let url = format!("{}/api/auth/validate-permission", user_service_url);
 
     let payload = serde_json::json!({
@@ -181,6 +193,6 @@ pub async fn has_permission(client: &Client, role_id: &str, permission_id: i32) 
         Err(err) => {
             eprintln!("Error consultando permisos al servicio de usuarios: {}", err);
             false
-        }
+        },
     }
 }

@@ -1,12 +1,15 @@
-use dotenv::dotenv;
-use actix_web::{web, App, HttpServer, middleware};
 use actix_cors::Cors;
-use std::sync::Arc;
+use actix_web::{middleware, web, App, HttpServer};
+use dotenv::dotenv;
 use env_logger::Env;
-use reqwest::Client;
-use redis::Client as RedisClient;
 use hub::context::Context;
-use hub::handlers::{http::{user, lang, asset, analytics, tenant, ai}, nats};
+use hub::handlers::{
+    http::{ai, analytics, asset, billing, lang, tenant, user},
+    nats,
+};
+use redis::Client as RedisClient;
+use reqwest::Client;
+use std::sync::Arc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -26,7 +29,11 @@ async fn main() -> std::io::Result<()> {
     println!("Cliente de Redis configurado para: {}", redis_url);
 
     let nats_url = dotenv::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".to_string());
-    let nats_client = Arc::new(async_nats::connect(nats_url).await.expect("Error conectando a NATS"));
+    let nats_client = Arc::new(
+        async_nats::connect(nats_url)
+            .await
+            .expect("Error conectando a NATS"),
+    );
     println!("Cliente de NATS configurado");
 
     let context = Arc::new(Context::new(client.clone(), redis_client.clone(), nats_client.clone()));
@@ -46,7 +53,6 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    
     HttpServer::new(move || {
         let cors = Cors::default()
             .allow_any_origin()
@@ -60,19 +66,19 @@ async fn main() -> std::io::Result<()> {
             .supports_credentials()
             .max_age(3600);
 
-        
         App::new()
-            .wrap(middleware::Logger::default()) 
-            .wrap(cors) 
-            .app_data(web::Data::new(context.clone())) 
-            .configure(user::service) 
+            .wrap(middleware::Logger::default())
+            .wrap(cors)
+            .app_data(web::Data::new(context.clone()))
+            .configure(user::service)
             .configure(lang::service)
             .configure(tenant::service)
+            .configure(billing::service)
             .configure(asset::service)
             .configure(analytics::service)
             .configure(ai::service)
     })
-        .bind(&bind_address)?
-        .run()
-        .await
+    .bind(&bind_address)?
+    .run()
+    .await
 }
